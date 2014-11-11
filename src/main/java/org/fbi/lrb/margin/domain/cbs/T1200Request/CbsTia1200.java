@@ -10,7 +10,7 @@ public class CbsTia1200 {
     @DataField(seq = 1)
     private String instCode;
     @DataField(seq = 2)
-    private String inData;
+    private String inDate;
     @DataField(seq = 3)
     private BigDecimal inAmount;
     @DataField(seq = 4)
@@ -28,12 +28,12 @@ public class CbsTia1200 {
         this.instCode = instCode;
     }
 
-    public String getInData() {
-        return inData;
+    public String getInDate() {
+        return inDate;
     }
 
-    public void setInData(String inData) {
-        this.inData = inData;
+    public void setInDate(String inDate) {
+        this.inDate = inDate;
     }
 
     public BigDecimal getInAmount() {
@@ -72,7 +72,7 @@ public class CbsTia1200 {
     public String toString() {
         return "CbsTia1200{" +
                 "instCode='" + instCode + '\'' +
-                ", inData='" + inData + '\'' +
+                ", inDate='" + inDate + '\'' +
                 ", inAmount=" + inAmount +
                 ", inName='" + inName + '\'' +
                 ", inAcct='" + inAcct + '\'' +
