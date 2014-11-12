@@ -89,7 +89,7 @@ public class T1200Processor extends AbstractTxnProcessor {
             txn.setInacct(tia.getInAcct());
             txn.setInname(tia.getInName());
             txn.setInamount(tia.getInAmount());
-            txn.setIndate(tia.getInDate());
+            txn.setIndate(tia.getInDate() + new SimpleDateFormat("HHmmdd").format(new Date()));  //14位日期
             txn.setInmemo(tia.getInMemo());  //子帐号
 
             mapper.insert(txn);
@@ -101,7 +101,7 @@ public class T1200Processor extends AbstractTxnProcessor {
             tpsTia.getHead().setTransDate(new SimpleDateFormat("yyyyMMdd").format(new Date()));
             tpsTia.getHead().setTransTime(new SimpleDateFormat("HHmmdd").format(new Date()));
             //tpsTia.getHead().setSeqNo(new SimpleDateFormat("yyyyMMddHHmmddSSS").format(new Date()));  //默认值
-            tpsTia.getHead().setSeqNo(hostTxnsn);  //主机交易流水号
+            tpsTia.getHead().setSeqNo(txnDate + hostTxnsn);  //交易日期+主机交易流水号
 
             String reqXml = tpsTia.toXml(tpsTia);
             String respXml = new String(processThirdPartyServer(reqXml.getBytes("GBK"), tpsTxnCode), "GBK");
