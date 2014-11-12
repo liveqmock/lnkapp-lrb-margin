@@ -7,15 +7,25 @@ import org.fbi.linking.processor.ProcessorException;
 import org.fbi.linking.processor.standprotocol10.Stdp10ProcessorRequest;
 import org.fbi.linking.processor.standprotocol10.Stdp10ProcessorResponse;
 import org.fbi.lrb.margin.domain.cbs.T1200Request.CbsTia1200;
+import org.fbi.lrb.margin.domain.tps.TIAG00001;
+import org.fbi.lrb.margin.domain.tps.TOAG00001;
 import org.fbi.lrb.margin.enums.TxnRtnCode;
 import org.fbi.lrb.margin.helper.MybatisFactory;
+import org.fbi.lrb.margin.helper.ProjectConfigManager;
+import org.fbi.lrb.margin.helper.TpsSocketClient;
+import org.fbi.lrb.margin.internal.AppActivator;
 import org.fbi.lrb.margin.repository.dao.LrbMargTxnMapper;
 import org.fbi.lrb.margin.repository.model.LrbMargTxn;
+import org.osgi.framework.BundleContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.URL;
 import java.sql.SQLException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Properties;
 
 /**
  * Created by zhanrui on 2014-11-11.
@@ -56,7 +66,7 @@ public class T1200Processor extends AbstractTxnProcessor {
     }
 
 
-    private CbsRtnInfo processTxn(CbsTia1200 tia, String txnDate,  String hostTxnsn) {
+    private CbsRtnInfo processTxn(CbsTia1200 tia, String txnDate,  String hostTxnsn) throws Exception {
         CbsRtnInfo cbsRtnInfo = new CbsRtnInfo();
         SqlSessionFactory sqlSessionFactory = null;
         SqlSession session = null;
@@ -84,13 +94,31 @@ public class T1200Processor extends AbstractTxnProcessor {
 
             mapper.insert(txn);
 
-            //TODO 国土局端处理
+            //国土局端处理
+            TIAG00001 tpsTia = new TIAG00001();
+            String tpsTxnCode = "G00001";
+            tpsTia.getHead().setTransCode(tpsTxnCode);
+            tpsTia.getHead().setTransDate(new SimpleDateFormat("yyyyMMdd").format(new Date()));
+            tpsTia.getHead().setTransTime(new SimpleDateFormat("HHmmdd").format(new Date()));
+            //tpsTia.getHead().setSeqNo(new SimpleDateFormat("yyyyMMddHHmmddSSS").format(new Date()));  //默认值
+            tpsTia.getHead().setSeqNo(hostTxnsn);  //主机交易流水号
 
+            String reqXml = tpsTia.toXml(tpsTia);
+            String respXml = new String(processThirdPartyServer(reqXml.getBytes("GBK"), tpsTxnCode), "GBK");
+            TOAG00001 tpsToa = new TOAG00001();
+            tpsToa.toBean(respXml);
+            String resultCode = tpsToa.getBody().getResult();
 
-            //交易处理成功
-            session.commit();
-            cbsRtnInfo.setRtnCode(TxnRtnCode.TXN_EXECUTE_SECCESS);
-            cbsRtnInfo.setRtnMsg(TxnRtnCode.TXN_EXECUTE_SECCESS.getTitle());
+            if ("00".equals(resultCode)) { //交易处理成功
+                session.commit();
+                cbsRtnInfo.setRtnCode(TxnRtnCode.TXN_EXECUTE_SECCESS);
+                cbsRtnInfo.setRtnMsg(TxnRtnCode.TXN_EXECUTE_SECCESS.getTitle());
+            }else{
+                session.rollback();
+                cbsRtnInfo.setRtnCode(TxnRtnCode.TXN_EXECUTE_FAILED);
+                cbsRtnInfo.setRtnMsg(resultCode + getTpsRtnErrorMsg(resultCode));
+            }
+
             return cbsRtnInfo;
         } catch (SQLException e) {
             session.rollback();
@@ -102,6 +130,46 @@ public class T1200Processor extends AbstractTxnProcessor {
                 session.close();
             }
         }
+    }
+
+    //第三方服务处理：可根据交易号设置不同的超时时间
+    private byte[] processThirdPartyServer(byte[] sendTpsBuf, String txnCode) throws Exception {
+        String servIp = ProjectConfigManager.getInstance().getProperty("tps.server.ip");
+        int servPort = Integer.parseInt(ProjectConfigManager.getInstance().getProperty("tps.server.port"));
+        TpsSocketClient client = new TpsSocketClient(servIp, servPort);
+
+        String timeoutCfg = ProjectConfigManager.getInstance().getProperty("tps.server.timeout.txn." + txnCode);
+        if (timeoutCfg != null) {
+            int timeout = Integer.parseInt(timeoutCfg);
+            client.setTimeout(timeout);
+        } else {
+            timeoutCfg = ProjectConfigManager.getInstance().getProperty("tps.server.timeout");
+            if (timeoutCfg != null) {
+                int timeout = Integer.parseInt(timeoutCfg);
+                client.setTimeout(timeout);
+            }
+        }
+
+        logger.info("TPS Request:" + new String(sendTpsBuf, "GBK"));
+        byte[] rcvTpsBuf = client.call(sendTpsBuf);
+        logger.info("TPS Response:" + new String(rcvTpsBuf, "GBK"));
+        return rcvTpsBuf;
+    }
+    private String getTpsRtnErrorMsg(String rtnCode) {
+        BundleContext bundleContext = AppActivator.getBundleContext();
+        URL url = bundleContext.getBundle().getEntry("rtncode.properties");
+
+        Properties props = new Properties();
+        try {
+            props.load(url.openConnection().getInputStream());
+        } catch (Exception e) {
+            throw new RuntimeException("错误码配置文件解析错误", e);
+        }
+        String property = props.getProperty(rtnCode);
+        if (property == null) {
+            property = "未定义对应的错误信息(错误码:" + rtnCode + ")";
+        }
+        return property;
     }
 
 }

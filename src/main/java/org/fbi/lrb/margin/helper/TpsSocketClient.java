@@ -29,8 +29,6 @@ public class TpsSocketClient {
     }
 
     /**
-     * @param sendbuf:不含3字节长度字段 和 1字节的加密标识
-     * @return 响应报文不含3字节的长度字段
      * @throws Exception 其中：SocketTimeoutException为超时异常
      */
     public byte[] call(byte[] sendbuf) throws Exception {
@@ -47,23 +45,23 @@ public class TpsSocketClient {
             os.flush();
 
             InputStream is = socket.getInputStream();
-            recvbuf = new byte[3];
+            recvbuf = new byte[6];
             int readNum = is.read(recvbuf);
             if (readNum == -1) {
                 throw new RuntimeException("服务器连接已关闭!");
             }
-            if (readNum < 3) {
+            if (readNum < 6) {
                 throw new RuntimeException("读取报文头长度部分错误...");
             }
             int msgLen = Integer.parseInt(new String(recvbuf).trim());
-            logger.info("报文头指示长度:" + msgLen);
-            recvbuf = new byte[msgLen - 3];
+            //logger.info("报文体长度:" + msgLen);
+            recvbuf = new byte[msgLen];
 
-            //TODO与市财政的网络连接不稳定 需延时一定时间
-            Thread.sleep(500);
+            //连接不稳定时 需延时一定时间
+            Thread.sleep(100);
 
             readNum = is.read(recvbuf);   //阻塞读
-            if (readNum != msgLen - 3) {
+            if (readNum != msgLen) {
                 throw new RuntimeException("报文长度错误,报文头指示长度:[" + msgLen + "], 实际获取长度:[" + readNum + "]");
             }
         } finally {
@@ -83,9 +81,9 @@ public class TpsSocketClient {
         String msg = "..........";
 
         String strLen = null;
-        strLen = "" + (msg.getBytes("GBK").length + 4);
+        strLen = "" + (msg.getBytes("GBK").length);
         String lpad = "";
-        for (int i = 0; i < 3 - strLen.length(); i++) {
+        for (int i = 0; i < 6 - strLen.length(); i++) {
             lpad += "0";
         }
         strLen = lpad + strLen;
@@ -93,7 +91,7 @@ public class TpsSocketClient {
 
         byte[] recvbuf = new byte[0];
         try {
-            recvbuf = mock.call(("0" + strLen + msg).getBytes("GBK"));
+            recvbuf = mock.call((strLen + msg).getBytes("GBK"));
         } catch (Exception e) {
             e.printStackTrace();
         }
