@@ -1,5 +1,7 @@
 package org.fbi.lrb.margin.server.processor;
 
+import org.apache.commons.lang.RandomStringUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.fbi.lrb.margin.helper.MybatisFactory;
@@ -16,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Random;
 
 /**
  * Created by zhanrui on 2014/11/6.
@@ -74,7 +77,8 @@ public class G00003Processor implements Processor {
             margAct.setInstseq(tia.getBody().getInstSeq());
             margAct.setMatuday(tia.getBody().getMatuDay());
 
-            String acctno = "37198" + tia.getBody().getInstSeq();
+//            String acctno = "37198" + tia.getBody().getInstSeq();
+            String acctno = new StringBuilder().append(tia.getBody().getInstCode()).append(new SimpleDateFormat("yyyyMMdd").format(new Date())).append(RandomStringUtils.randomNumeric(4)).toString();
             margAct.setAcctno(acctno);
             margAct.setActSts("0");
             margAct.setActBal(new BigDecimal("0"));

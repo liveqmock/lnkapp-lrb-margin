@@ -1,5 +1,6 @@
 package org.fbi.lrb.margin.processor;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.fbi.linking.codec.dataformat.SeperatedTextDataFormat;
@@ -26,6 +27,14 @@ import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Properties;
+
+import org.apache.commons.lang.StringUtils;
+import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
+
+import javax.lang.model.element.Element;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
 
 /**
  * Created by zhanrui on 2014-11-11.
@@ -89,7 +98,8 @@ public class T1200Processor extends AbstractTxnProcessor {
             txn.setInacct(tia.getInAcct());
             txn.setInname(tia.getInName());
             txn.setInamount(tia.getInAmount());
-            txn.setIndate(tia.getInDate() + new SimpleDateFormat("HHmmdd").format(new Date()));  //14位日期
+            txn.setIndate(tia.getInDate());  //14位日期
+//            txn.setIndate(tia.getInDate() + new SimpleDateFormat("HHmmss").format(new Date()));  //14位日期
             txn.setInmemo(tia.getInMemo());  //子帐号
 
             mapper.insert(txn);
@@ -99,15 +109,31 @@ public class T1200Processor extends AbstractTxnProcessor {
             String tpsTxnCode = "G00001";
             tpsTia.getHead().setTransCode(tpsTxnCode);
             tpsTia.getHead().setTransDate(new SimpleDateFormat("yyyyMMdd").format(new Date()));
-            tpsTia.getHead().setTransTime(new SimpleDateFormat("HHmmdd").format(new Date()));
-            //tpsTia.getHead().setSeqNo(new SimpleDateFormat("yyyyMMddHHmmddSSS").format(new Date()));  //默认值
+            tpsTia.getHead().setTransTime(new SimpleDateFormat("HHmmss").format(new Date()));
+            //tpsTia.getHead().setSeqNo(new SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date()));  //默认值
             tpsTia.getHead().setSeqNo(txnDate + hostTxnsn);  //交易日期+主机交易流水号
 
+            //设置报文体 20141204 linyong
+            tpsTia.getBody().setInstCode(tia.getInstCode());
+            tpsTia.getBody().setInDate(tia.getInDate());
+//            tpsTia.getBody().setInDate(tia.getInDate() + new SimpleDateFormat("HHmmss").format(new Date()));
+            tpsTia.getBody().setInAmount(tia.getInAmount().toString());
+            tpsTia.getBody().setInName(tia.getInName());
+            tpsTia.getBody().setInAcct(tia.getInAcct());
+            tpsTia.getBody().setInMemo(tia.getInMemo());
+            tpsTia.getBody().setInBankFLCode(txnDate + hostTxnsn);
             String reqXml = tpsTia.toXml(tpsTia);
+            reqXml = "<?xml version=\"1.0\" encoding=\"GBK\"?>\n"+reqXml;
+            reqXml = StringUtils.replace(reqXml,"\r","");
+            reqXml = StringUtils.replace(reqXml,"\n","");
+            int intLength = reqXml.getBytes("GBK").length;
+            String strLength = "";
+            strLength = StringUtils.leftPad(intLength + "", 6, "0");
+            reqXml = strLength +""+ reqXml;
             String respXml = new String(processThirdPartyServer(reqXml.getBytes("GBK"), tpsTxnCode), "GBK");
-            TOAG00001 tpsToa = new TOAG00001();
-            tpsToa.toBean(respXml);
+            TOAG00001 tpsToa = (TOAG00001)new TOAG00001().toBean(respXml);
             String resultCode = tpsToa.getBody().getResult();
+            logger.info("结果码："+resultCode);
 
             if ("00".equals(resultCode)) { //交易处理成功
                 session.commit();
@@ -118,7 +144,6 @@ public class T1200Processor extends AbstractTxnProcessor {
                 cbsRtnInfo.setRtnCode(TxnRtnCode.TXN_EXECUTE_FAILED);
                 cbsRtnInfo.setRtnMsg(resultCode + getTpsRtnErrorMsg(resultCode));
             }
-
             return cbsRtnInfo;
         } catch (SQLException e) {
             session.rollback();

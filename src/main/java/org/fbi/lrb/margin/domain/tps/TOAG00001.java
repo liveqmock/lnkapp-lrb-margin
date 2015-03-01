@@ -20,7 +20,6 @@ public class TOAG00001 extends TpsMsg {
 
     public static class MsgBody extends TpsMsgBody {
         private String Result;
-        private String AcctNo;
         private String AddWord;
 
         public String getResult() {
@@ -29,14 +28,6 @@ public class TOAG00001 extends TpsMsg {
 
         public void setResult(String result) {
             this.Result = result;
-        }
-
-        public String getAcctNo() {
-            return AcctNo;
-        }
-
-        public void setAcctNo(String acctNo) {
-            this.AcctNo = acctNo;
         }
 
         public String getAddWord() {
@@ -51,8 +42,7 @@ public class TOAG00001 extends TpsMsg {
         public String toString() {
             return "MsgBody{" +
                     "Result='" + Result + '\'' +
-                    ", AcctNo='" + AcctNo + '\'' +
-                    ", Count='" + AddWord + '\'' +
+                    ", AddWord='" + AddWord + '\'' +
                     '}';
         }
     }
